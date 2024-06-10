@@ -1,7 +1,7 @@
 import re
-from datetime import datetime
 
 import requests
+from dateutil import parser
 from flask import Flask, request, abort, jsonify
 from flask_cors import cross_origin
 
@@ -58,7 +58,7 @@ def get_content_info_lang(lang):
 def format_iso_time(time_str):
     try:
         # 解析时间字符串
-        dt = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+        dt = parser.isoparse(time_str)
         # 格式化为所需的格式
         formatted_time = dt.strftime("%Y年%m月%d日 %H时%M分%S秒")
         return formatted_time

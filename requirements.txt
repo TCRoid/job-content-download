@@ -1,3 +1,4 @@
 requests==2.32.2
 flask==3.0.3
 flask-cors==3.0.10
+python-dateutil==2.9.0post0
