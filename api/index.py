@@ -14,7 +14,7 @@ def index():
 
 
 @app.route('/content_info', methods=['POST'])
-@cross_origin()  # 只对这个路由启用CORS
+@cross_origin()  # 只对这个路由启用 CORS
 def job_content_info():
     if request.method != 'POST':
         abort(405)
@@ -25,24 +25,38 @@ def job_content_info():
     if not url:
         return jsonify({'status': 'error', 'message': '差事链接不能为空'})
 
-    # 验证URL格式
-    pattern = r'https://socialclub\.rockstargames\.com/job/gtav/([a-zA-Z0-9_]+)'
-    match = re.match(pattern, url)
-    if not match:
+    # 根据 URL 获取 Content ID
+    content_id = get_content_id_from_url(url)
+    if not content_id:
         return jsonify({'status': 'error', 'message': '差事链接格式不正确'})
 
-    # 截取最后一段字符
-    content_id = match.group(1)
-
-    success, img, info = get_content_info(content_id, lang)
-    if success:
+    result = get_content_info(content_id, lang)
+    if result['status']:
         json_url = get_content_json_url(content_id, lang)
-        if not json_url:
-            json_url = ''
+        return jsonify({'status': 'success', 'img': result['img'], 'data': result['info'], 'json_url': json_url})
 
-        return jsonify({'status': 'success', 'img': img, 'data': info, 'json_url': json_url})
+    return jsonify({'status': 'error', 'message': '获取信息失败，请检查链接是否正确'})
 
-    return jsonify({'status': 'error', 'message': '获取信息失败'})
+
+def get_content_id_from_url(url):
+    # 首先尝试匹配整个URL
+    pattern_full_url = r'https?://socialclub\.rockstargames\.com/job/gtav/([a-zA-Z0-9_-]+)'
+    match = re.fullmatch(pattern_full_url, url)
+
+    if match:
+        # 如果是完整的URL，则返回匹配的字符串
+        return match.group(1)
+
+    # 如果不是完整的URL，尝试直接匹配字符串
+    pattern_code_only = r'^[a-zA-Z0-9_-]+$'
+    match_code = re.fullmatch(pattern_code_only, url)
+
+    if match_code:
+        # 如果是单独的字符串，则返回该字符串
+        return url
+
+    # 如果都不匹配，返回错误信息
+    return None
 
 
 def get_content_info_lang(lang):
@@ -68,6 +82,8 @@ def format_iso_time(time_str):
 
 
 def get_content_info(content_id, lang='en'):
+    result = {'status': False}
+
     response = requests.get(
         f'https://scapi.rockstargames.com/ugc/mission/details?title=gtav&contentId={content_id}',
         headers={
@@ -80,9 +96,17 @@ def get_content_info(content_id, lang='en'):
     )
 
     if response.status_code != 200:
-        return False
+        return result
 
-    content = response.json()['content']
+    try:
+        res = response.json()
+    except Exception as e:
+        return result
+
+    if not res['status']:
+        return result
+
+    content = res['content']
 
     data = {
         "contentName": content['name'],
@@ -94,7 +118,11 @@ def get_content_info(content_id, lang='en'):
         "dislikeCount": content['dislikeCount'],
         "playedCount": content['playedCount']
     }
-    return True, content['imgSrc'], data
+    return {
+        'status': True,
+        'img': content['imgSrc'],
+        'info': data
+    }
 
 
 def get_content_json_url(content_id, lang='en'):
@@ -110,6 +138,8 @@ def get_content_json_url(content_id, lang='en'):
 
         if response.status_code == 200:
             return url
+
+    return ''
 
 
 if __name__ == '__main__':
